@@ -39,7 +39,7 @@ type Context interface {
 	JSON(int, interface{})
 	TransactionID() string
 	Audience() string
-	Param(string) string
+	Params(string) string
 }
 
 func (t *TodoHandler) NewTask(c Context) {
@@ -91,7 +91,7 @@ func (t *TodoHandler) List(c Context) {
 }
 
 func (t *TodoHandler) Remove(c Context) {
-	idParam := c.Param("id")
+	idParam := c.Params("id")
 
 	id, err := strconv.Atoi(idParam)
 	if err != nil {

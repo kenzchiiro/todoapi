@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/gofiber/fiber/v2 v2.41.0
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect
 	go.mongodb.org/mongo-driver v1.11.1

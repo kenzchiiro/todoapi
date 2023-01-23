@@ -35,7 +35,7 @@ func (c *MyContext) Audience() string {
 	return ""
 }
 
-func (c *MyContext) Param(v string) string {
+func (c *MyContext) Params(v string) string {
 	return c.Context.Param(v)
 }
 

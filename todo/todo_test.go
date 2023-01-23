@@ -53,6 +53,6 @@ func (TestContext) Audience() string {
 	return "Unit Test"
 }
 
-func (TestContext) Param(v string) string {
-	return "Param"
+func (TestContext) Params(v string) string {
+	return "Params"
 }
