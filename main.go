@@ -15,9 +15,9 @@ import (
 	"github.com/pallat/todoapi/router"
 	"github.com/pallat/todoapi/store"
 	"github.com/pallat/todoapi/todo"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/time/rate"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 )
 
 var (
@@ -31,32 +31,27 @@ func main() {
 		log.Printf("please consider environment variables: %s\n", err)
 	}
 
-	db, err := gorm.Open(mysql.Open(os.Getenv("DB_CONN")), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect database")
-	}
+	// db, err := gorm.Open(mysql.Open(os.Getenv("DB_CONN")), &gorm.Config{})
+	// if err != nil {
+	// 	panic("failed to connect database")
+	// }
 
 	// if err := db.AutoMigrate(&todo.Todo{}); err != nil {
 	// 	log.Println("auto migrate db", err)
 	// }
 
-	// r := gin.Default()
-	// config := cors.DefaultConfig()
-	// config.AllowOrigins = []string{
-	// 	"*",
-	// }
-	// config.AllowHeaders = []string{
-	// 	"Origin",
-	// 	"Authorization",
-	// 	"TransactionID",
-	// }
-	// r.Use(cors.New(config))
+	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(os.Getenv("MONGO_CONN")))
+	if err != nil {
+		log.Fatal(err)
+	}
+	collection := client.Database("myapp").Collection("todos")
 
 	r := router.NewMyRouter()
 
-	gormStore := store.NewGormStore(db)
+	// gormStore := store.NewGormStore(db)
+	mongoStore := store.NewMongoDBStore(collection)
 
-	handler := todo.NewTodoHandler(gormStore)
+	handler := todo.NewTodoHandler(mongoStore)
 	r.POST("/todos", handler.NewTask)
 	r.GET("/todos", handler.List)
 	r.DELETE("/todos/:id", handler.Remove)
