@@ -10,9 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/pallat/todoapi/router"
+	"github.com/pallat/todoapi/store"
 	"github.com/pallat/todoapi/todo"
 	"golang.org/x/time/rate"
 	"gorm.io/driver/mysql"
@@ -39,35 +40,26 @@ func main() {
 	// 	log.Println("auto migrate db", err)
 	// }
 
-	r := gin.Default()
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{
-		"*",
-	}
-	config.AllowHeaders = []string{
-		"Origin",
-		"Authorization",
-		"TransactionID",
-	}
-	r.Use(cors.New(config))
+	// r := gin.Default()
+	// config := cors.DefaultConfig()
+	// config.AllowOrigins = []string{
+	// 	"*",
+	// }
+	// config.AllowHeaders = []string{
+	// 	"Origin",
+	// 	"Authorization",
+	// 	"TransactionID",
+	// }
+	// r.Use(cors.New(config))
 
-	r.GET("/healthz", func(c *gin.Context) {
-		c.Status(200)
-	})
-	r.GET("/limitz", limitedHandler)
-	r.GET("/x", func(c *gin.Context) {
-		c.JSON(200, map[string]interface{}{
-			"buildcommit": buildcommit,
-			"buildtime":   buildtime,
-		})
-	})
+	r := router.NewMyRouter()
 
-	gormStore := todo.NewGormStore(db)
+	gormStore := store.NewGormStore(db)
 
 	handler := todo.NewTodoHandler(gormStore)
-	r.POST("/todos", todo.NewGinHandler(handler.NewTask))
-	r.GET("/todos", todo.NewGinHandler(handler.List))
-	r.DELETE("/todos/:id", todo.NewGinHandler(handler.Remove))
+	r.POST("/todos", handler.NewTask)
+	r.GET("/todos", handler.List)
+	r.DELETE("/todos/:id", handler.Remove)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
