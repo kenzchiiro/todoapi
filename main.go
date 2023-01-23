@@ -13,11 +13,10 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"golang.org/x/time/rate"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-
 	"github.com/pallat/todoapi/todo"
+	"golang.org/x/time/rate"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 var (
@@ -26,24 +25,24 @@ var (
 )
 
 func main() {
-	err = godotenv.Load("local.env")
+	err := godotenv.Load("local.env")
 	if err != nil {
 		log.Printf("please consider environment variables: %s\n", err)
 	}
 
-	db, err := gorm.Open(sqlite.Open(os.Getenv("DB_CONN")), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(os.Getenv("DB_CONN")), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect database")
 	}
 
-	if err :=db.AutoMigrate(&todo.Todo{});err != nil {
-		log.Println("auto migrate db",err)
-	}
+	// if err := db.AutoMigrate(&todo.Todo{}); err != nil {
+	// 	log.Println("auto migrate db", err)
+	// }
 
 	r := gin.Default()
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{
-		"http://localhost:8080",
+		"*",
 	}
 	config.AllowHeaders = []string{
 		"Origin",
@@ -57,17 +56,18 @@ func main() {
 	})
 	r.GET("/limitz", limitedHandler)
 	r.GET("/x", func(c *gin.Context) {
-		c.JSON(200, gin.H{
+		c.JSON(200, map[string]interface{}{
 			"buildcommit": buildcommit,
 			"buildtime":   buildtime,
 		})
 	})
 
+	gormStore := todo.NewGormStore(db)
 
-	handler := todo.NewTodoHandler(db)
-	r.POST("/todos", handler.NewTask)
-	r.GET("/todos", handler.List)
-	r.DELETE("/todos/:id", handler.Remove)
+	handler := todo.NewTodoHandler(gormStore)
+	r.POST("/todos", todo.NewGinHandler(handler.NewTask))
+	r.GET("/todos", todo.NewGinHandler(handler.List))
+	r.DELETE("/todos/:id", todo.NewGinHandler(handler.Remove))
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -105,7 +105,7 @@ func limitedHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusTooManyRequests)
 		return
 	}
-	c.JSON(200, gin.H{
+	c.JSON(200, map[string]interface{}{
 		"message": "pong",
 	})
 }

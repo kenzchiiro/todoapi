@@ -4,65 +4,84 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
+	"time"
 )
 
 type Todo struct {
-	Title string `json:"text" binding:"required"`
-	gorm.Model
+	Title     string `json:"text" binding:"required"`
+	ID        uint   `gorm:"primarykey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (Todo) TableName() string {
 	return "todos"
 }
 
+// my custom store type
+type storer interface {
+	New(*Todo) error
+	Find(*[]Todo) error
+	Delete(*Todo, int) error
+}
+
 type TodoHandler struct {
-	db *gorm.DB
+	store storer
 }
 
-func NewTodoHandler(db *gorm.DB) *TodoHandler {
-	return &TodoHandler{db: db}
+func NewTodoHandler(store storer) *TodoHandler {
+	return &TodoHandler{store: store}
 }
 
-func (t *TodoHandler) NewTask(c *gin.Context) {
+// my custom context
+type Context interface {
+	Bind(interface{}) error
+	JSON(int, interface{})
+	TransactionID() string
+	Audience() string
+	Param(string) string
+}
+
+func (t *TodoHandler) NewTask(c Context) {
 	var todo Todo
-	if err := c.ShouldBindJSON(&todo); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+	// if err := c.ShouldBindJSON(&todo); err != nil {
+	if err := c.Bind(&todo); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": err.Error(),
 		})
 		return
 	}
 
 	if todo.Title == "sleep" {
-		transactionID := c.Request.Header.Get("TransactionID")
-		aud, _ := c.Get("aud")
+		// transactionID := c.Request.Header.Get("TransactionID")
+		transactionID := c.TransactionID()
+		// aud, _ := c.Get("aud")
+		aud := c.Audience()
 		log.Println(transactionID, aud, "not allowed")
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": "not allowed",
 		})
 		return
 	}
 
-	r := t.db.Create(&todo)
-	if err := r.Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+	err := t.store.New(&todo)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"ID": todo.Model.ID,
+	c.JSON(http.StatusCreated, map[string]interface{}{
+		"ID": todo.ID,
 	})
 }
 
-func (t *TodoHandler) List(c *gin.Context) {
+func (t *TodoHandler) List(c Context) {
 	var todos []Todo
-	r := t.db.Find(&todos)
-	if err := r.Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+	err := t.store.Find(&todos)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error": err.Error(),
 		})
 		return
@@ -71,26 +90,26 @@ func (t *TodoHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, todos)
 }
 
-func (t *TodoHandler) Remove(c *gin.Context) {
+func (t *TodoHandler) Remove(c Context) {
 	idParam := c.Param("id")
 
 	id, err := strconv.Atoi(idParam)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	r := t.db.Delete(&Todo{}, id)
-	if err := r.Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+	err = t.store.Delete(&Todo{}, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	c.JSON(http.StatusOK, map[string]interface{}{
 		"status": "success",
 	})
 }
